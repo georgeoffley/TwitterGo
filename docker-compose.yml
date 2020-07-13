@@ -1,0 +1,31 @@
+version: '3'
+services:
+  app:
+    image: golang:1.14.1
+    container_name: ctxapp
+    volumes: 
+        - .:/go
+    working_dir: /go
+    command: go run main.go
+  web:
+    build: .
+    ports: 
+        - 8080:8080
+  db:
+    image: mongo:3.6.1
+    container_name: ctx-social
+    env_file: 
+        - .env
+    environment: 
+        - MONGO_INITDB_DATABASE=${MONGODB_DBNAME}
+        - MONGO_INITDB_USERNAME=${MONGODB_USERNAME}
+        - MONGO_INITDB_PASSWORD=${MONGODB_PASSWORD}
+    volumes: 
+        - mongodb:/data/db
+    ports:
+        - 27017-27019:27017-27019
+    command: mongod
+
+volumes:
+  mongodb:
+  mongodb_config:
