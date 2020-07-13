@@ -4,13 +4,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	//"github.com/gorilla/mux"
 	"github.com/amit-lulla/twitterapi"
-
 	"github.com/joho/godotenv"
 )
+
+type server struct{}
 
 // APICred Struct for storing credentials
 type APICred struct {
@@ -62,6 +63,13 @@ func CreateTwitterConn() (api *twitterapi.TwitterApi) {
 	return api
 }
 
+// API returns
+func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "hello World"}`))
+}
+
 func main() {
 	fmt.Println("Hello from your Twitter container")
 
@@ -73,4 +81,10 @@ func main() {
 		fmt.Printf("TweetId: %+v\n", tweet.Id)
 		fmt.Printf("Tweet Text: %+v\n", tweet.Text)
 	}
+
+	// Router
+	fmt.Print("Starting Server")
+	serv := &server{}
+	http.Handle("/", serv)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }

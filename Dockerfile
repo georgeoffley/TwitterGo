@@ -1,10 +1,5 @@
 FROM golang:1.14.1
-WORKDIR /home
+WORKDIR /go/src/
 ENV ENV GOPATH
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y git \
-    go get -d -v github.com/joho/godotenv \
-    go get -d -v github.com/gorilla/mux \
-    go get -d -v github.com/amit-lulla/twitterapi
+COPY . .
 CMD ["go","run","main.go"]
