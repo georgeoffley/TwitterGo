@@ -8,12 +8,13 @@ services:
     working_dir: /go
     command: go run main.go
   web:
+    container_name: ctx-api-calls
     build: .
     ports: 
         - 8080:8080
   db:
     image: mongo:3.6.1
-    container_name: ctx-social
+    container_name: ctx-social-db
     env_file: 
         - .env
     environment: 

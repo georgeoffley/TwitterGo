@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/amit-lulla/twitterapi"
 	"github.com/joho/godotenv"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type server struct{}
@@ -63,11 +67,29 @@ func CreateTwitterConn() (api *twitterapi.TwitterApi) {
 	return api
 }
 
+// TODO: Figure out how to get the DB connection up and how to populate it with collections etc
 // API returns
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// MongoDB connection
+	fmt.Print("Connecting to DB...")
+
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+
+	client, err := mongo.Connect(context.TODO(), clientOptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connected to DB")
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message": "hello World"}`))
+	w.Write([]byte(`{"message": "Connected to DB"}`))
 }
 
 func main() {
@@ -82,9 +104,10 @@ func main() {
 		fmt.Printf("Tweet Text: %+v\n", tweet.Text)
 	}
 
-	// Router
-	fmt.Print("Starting Server")
+	// Router Service Creation
+	fmt.Print("Starting Server...")
 	serv := &server{}
 	http.Handle("/", serv)
 	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Print("Server Started!")
 }
