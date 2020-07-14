@@ -11,9 +11,12 @@ import (
 	"github.com/amit-lulla/twitterapi"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+///// Custom Data Types
 
 // APICred Struct for storing credentials
 type APICred struct {
@@ -32,6 +35,7 @@ type SocialRecord struct {
 	Created  string
 }
 
+/////// Twitter Functions
 // TODO: Make concurrent
 // Load Env file and fill out credentials for API
 func LoadEnv() (env APICred) {
@@ -74,7 +78,7 @@ func CreateTwitSearch(api *twitterapi.TwitterApi, query string) (searchResult tw
 	return searchResult
 }
 
-// DB Stuff
+//////// DB Functions
 
 // DB Connection
 func CreateDBCon() (client *mongo.Client) {
@@ -101,7 +105,52 @@ func CollectionItem(client *mongo.Client, dbName string, collectionNam string) (
 	return collection
 }
 
-// API returns
+// Search all docs in collection
+func ReturnAllDocs(client *mongo.Client, collection *mongo.Collection) (results []bson.M) {
+
+	cursor, err := collection.Find(context.TODO(), bson.M{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var records []bson.M
+	/*
+		In production this would be cursor.Next() so that we're returning
+		the data in batches and not all at once. A production system would have millions
+		of records (documents) to return
+	*/
+	if err = cursor.All(context.TODO(), &records); err != nil {
+		log.Fatal(err)
+	}
+	return records
+}
+
+// Search single doc. Use the filter argument to find the document required
+func SingleDoc(client *mongo.Client, collection *mongo.Collection, filter bson.M) (tweet bson.M) {
+	if err := collection.FindOne(context.TODO(), filter).Decode(&tweet); err != nil {
+		log.Fatal(err)
+	}
+
+	return tweet
+}
+
+// Search many docs. Use the filter argument to find the documents required
+func ManyDocs(client *mongo.Client, collection *mongo.Collection, filter bson.M) (tweets []bson.M) {
+
+	cursor, err := collection.Find(context.TODO(), filter)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Same production ready changes to be applied here as with the all docs
+	if err = cursor.All(context.TODO(), &tweets); err != nil {
+		log.Fatal(err)
+	}
+
+	return tweets
+}
+
+///// API Stuff
 func SearchPhrase(write http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
 	write.Header().Set("Content-Type", "text/html")
@@ -113,8 +162,12 @@ func main() {
 	fmt.Print("Hello from your Twitter container\n")
 
 	/////// DB Stuff
-	client := CreateDBCon()
-	collection := CollectionItem(client, "icxSocial", "icxSocial")
+	/*
+		Reuse connection pool below
+		so that we can do not have to keep opening DB connections
+	*/
+	dbclient := CreateDBCon()
+	tweetcollection := CollectionItem(dbclient, "icxSocial", "icxSocial")
 
 	////// Twitter Stuff
 	api := CreateTwitterConn()
@@ -137,11 +190,15 @@ func main() {
 	}
 
 	// Take Populated Interface and Insert Records into DB
-	insert, err := collection.InsertMany(context.TODO(), BulkRecords)
+	insert, err := tweetcollection.InsertMany(context.TODO(), BulkRecords)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Inserted Many Docs: %+v\n", insert.InsertedIDs)
+
+	// Testing
+	filter := bson.M{"likes": 0}
+	fmt.Println(ManyDocs(dbclient, tweetcollection, filter))
 
 	/////// ROuter STuff
 	fmt.Print("Starting Server...\n")
