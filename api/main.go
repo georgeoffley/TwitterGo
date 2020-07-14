@@ -67,9 +67,40 @@ func CreateTwitterConn() (api *twitterapi.TwitterApi) {
 	return api
 }
 
-// DB Connections
+// Create Search
+func CreateTwitSearch(api *twitterapi.TwitterApi, query string) (searchResult twitterapi.SearchResponse) {
+	searchResult, _ = api.GetSearch(query, nil)
 
-// TODO: Figure out how to get the DB connection up and how to populate it with collections etc
+	return searchResult
+}
+
+// DB Stuff
+
+// DB Connection
+func CreateDBCon() (client *mongo.Client) {
+	// TODO: Put into function for multiple uses
+	clientoptions := options.Client().ApplyURI("mongodb://icx-db-mongo:27017")
+	client, err := mongo.Connect(context.TODO(), clientoptions)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Print("Connected to Mongo!\n")
+
+	return client
+}
+
+// Create Collection for sending data to
+func CollectionItem(client *mongo.Client, dbName string, collectionNam string) (collection *mongo.Collection) {
+	collection = client.Database(dbName).Collection(collectionNam)
+
+	return collection
+}
+
 // API returns
 func SearchPhrase(write http.ResponseWriter, req *http.Request) {
 	params := mux.Vars(req)
@@ -79,50 +110,41 @@ func SearchPhrase(write http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	fmt.Println("Hello from your Twitter container")
+	fmt.Print("Hello from your Twitter container\n")
+
+	/////// DB Stuff
+	client := CreateDBCon()
+	collection := CollectionItem(client, "icxSocial", "icxSocial")
 
 	////// Twitter Stuff
 	api := CreateTwitterConn()
+	searchResult := CreateTwitSearch(api, "hip-hop")
 
-	// TODO: Set up Function for searching
-	searchResult, _ := api.GetSearch("hip-hop", nil)
+	// Initialize Bulk Record Collection and Record data type
+	var BulkRecords []interface{}
+	tempSocialRecord := SocialRecord{}
 
+	// Iterate through tweets and add to single interface
 	for _, tweet := range searchResult.Statuses {
-		fmt.Printf("UserName: %+v\n", tweet.User.ScreenName)
-		fmt.Printf("TweetId: %+v\n", tweet.Id)
-		fmt.Printf("Tweet Text: %+v\n", tweet.Text)
-		fmt.Printf("Liked Count: %+v\n", tweet.FavoriteCount)
-		fmt.Printf("Retweet Count: %+v\n", tweet.RetweetCount)
-		fmt.Printf("Created At: %+v\n", tweet.CreatedAt)
+		tempSocialRecord.TweetId = tweet.Id
+		tempSocialRecord.UserName = tweet.User.ScreenName
+		tempSocialRecord.Tweet = tweet.Text
+		tempSocialRecord.Likes = tweet.FavoriteCount
+		tempSocialRecord.Retweets = tweet.RetweetCount
+		tempSocialRecord.Created = tweet.CreatedAt
+
+		BulkRecords = append(BulkRecords, tempSocialRecord)
 	}
 
-	// TODO: Put into function for multiple uses
-	clientoptions := options.Client().ApplyURI("mongodb://icx-db-mongo:27017")
-	client, err := mongo.Connect(context.TODO(), clientoptions)
+	// Take Populated Interface and Insert Records into DB
+	insert, err := collection.InsertMany(context.TODO(), BulkRecords)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Testing connection
-	err = client.Ping(context.TODO(), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Print("Connected to Mongo!")
-
-	// TODO: Put the collection in it's own function since it needs to be reused for readng and writing
-	collection := client.Database("icxSocial").Collection("icxSocial")
-	Record := SocialRecord{45, "Someone", "This is a tweet", 4, 1, "07/13/2020 06:00:00 AM"}
-
-	insert, err := collection.InsertOne(context.TODO(), Record)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Inserted Single Doc: ", insert.InsertedID)
+	fmt.Printf("Inserted Many Docs: %+v\n", insert.InsertedIDs)
 
 	/////// ROuter STuff
-	fmt.Print("Starting Server...")
+	fmt.Print("Starting Server...\n")
 
 	router := mux.NewRouter()
 	router.Queries("searchInput", "{searchInput}")
