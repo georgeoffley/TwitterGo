@@ -1,20 +1,27 @@
 version: '3'
 services:
-  app:
+  api:
     image: golang:1.14.1
-    container_name: ctxapp
-    volumes: 
-        - .:/go
-    working_dir: /go
+    container_name: icx-api-go
+    build: './api'
+    ports:
+      - 8080:8080
+    volumes:
+      - ./api:/go/src/app
     command: go run main.go
+    depends_on: 
+      - 'db'
   web:
-    container_name: ctx-api-calls
-    build: .
+    container_name: icx-api-web-page
+    image: 'nginx:latest'
+    build: ./web
     ports: 
-        - 8080:8080
+        - 80:80
+    volumes:
+      - './web'
   db:
     image: mongo:3.6.1
-    container_name: ctx-social-db
+    container_name: icx-db-mongo
     env_file: 
         - .env
     environment: 
@@ -24,7 +31,7 @@ services:
     volumes: 
         - mongodb:/data/db
     ports:
-        - 27017-27019:27017-27019
+        - 27017:27017
     command: mongod
 
 volumes:
