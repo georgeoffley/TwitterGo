@@ -49,7 +49,7 @@ type SocialRecord struct {
 
 /////// Twitter Functions
 // TODO: Make concurrent
-// Load Env file and fill out credentials for API
+// Load Env file and fill out credentials for API and DB
 func LoadEnv() (env APICred) {
 	// TODO: Make this concurrent
 	err := godotenv.Load()
