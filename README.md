@@ -30,6 +30,10 @@ icx_social_app
 - docker-compose.yml
 - README.md
 
+## Package Management
+
+After some experimenting I discovered using Go Modules for external package manegement. For a large scale project having these libraries more local would be more practical.
+
 ## Enviornment Files
 
 Enviornment files are included to keep them anonymous for sites like github and to take advantage of write once and read many style of storing confidential constants.
