@@ -1,4 +1,3 @@
-// New app script. Will use for creating own API calls
 package main
 
 import (
@@ -17,7 +16,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// Using one connection to DB
+// Using one connection to DB for entire app
 var client = *CreateDBCon()
 
 // Saving todo since the context can be vague
@@ -37,7 +36,7 @@ type APICred struct {
 	AccessTokenSecret string
 }
 
-// Also hold json and bson formatting for easier working with json
+// Also hold json and bson formatting for easier working with json and bson
 type SocialRecord struct {
 	TweetId  int64  `json:"tweetid" bson:"tweetid"`
 	UserName string `json:"username" bson:"username"`
@@ -94,7 +93,6 @@ func CreateTwitSearch(api *twitterapi.TwitterApi, query string) (searchResult tw
 
 // DB Connection
 func CreateDBCon() (client *mongo.Client) {
-	// TODO: Put into function for multiple uses
 	clientoptions := options.Client().ApplyURI("mongodb://icx-db-mongo:27017")
 	client, err := mongo.Connect(ctx, clientoptions)
 	if err != nil {
@@ -143,6 +141,10 @@ func ReturnAllDocs(client *mongo.Client, collection *mongo.Collection) (results 
 func SearchMostPopularBySubject(category string) (mostPopularRecord SocialRecord) {
 	grabTweetCollection := CollectionItem(&client, dbname, collectionName)
 
+	/*
+		This establishes the options for the search. In this case we query a
+		descending list and grab the first in the list
+	*/
 	opts := options.FindOne().SetSort(bson.D{{category, -1}})
 
 	err := grabTweetCollection.FindOne(ctx, bson.D{}, opts).Decode(&mostPopularRecord)
@@ -159,21 +161,21 @@ func SearchMostPopularBySubject(category string) (mostPopularRecord SocialRecord
 
 ///// API Calls
 
-// Search For most liked tweets and return to endpoint
+// Most Liked
 func SearchMostLikedTweet(write http.ResponseWriter, req *http.Request) {
 	write.Header().Set("Content-Type", "application/json")
 	mostLiked := SearchMostPopularBySubject("likes")
 	json.NewEncoder(write).Encode(mostLiked)
 }
 
-// Search Most retweeted tweet
+// Most Retweeted
 func SearchMostRtTweet(write http.ResponseWriter, req *http.Request) {
 	write.Header().Set("Content-Type", "application/json")
 	mostRt := SearchMostPopularBySubject("retweets")
 	json.NewEncoder(write).Encode(mostRt)
 }
 
-// Search for all tweets
+// All tweets
 func SearchAll(write http.ResponseWriter, req *http.Request) {
 	write.Header().Set("Content-Type", "application/json")
 	grabTweetCollection := CollectionItem(&client, dbname, collectionName)
@@ -181,16 +183,10 @@ func SearchAll(write http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(write).Encode(alldocs)
 }
 
-//
-
 func main() {
-	fmt.Print("Hello from your Twitter container\n")
+	fmt.Print("Hello from the ICX Assessment App\n")
 
 	/////// DB Stuff
-	/*
-		Reuse connection pool below
-		so that we can do not have to keep opening DB connections
-	*/
 	dbclient := &client
 	tweetcollection := CollectionItem(dbclient, dbname, collectionName)
 
@@ -222,10 +218,7 @@ func main() {
 	}
 	fmt.Printf("Inserted Many Docs: %+v\n", insert.InsertedIDs)
 
-	// Testing
-	//fmt.Println(ReturnAllDocs(dbclient, tweetcollection))
-
-	/////// ROuter STuff
+	// Ruter connections
 	fmt.Print("Starting API Server...\n")
 
 	router := mux.NewRouter()
