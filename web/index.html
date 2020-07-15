@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
 
-    <title>The HTML5 Herald</title>
+    <title>Hip-Hop Analytics</title>
     <meta name="description" content="The HTML5 Herald">
     <meta name="author" content="SitePoint">
 
@@ -15,14 +15,24 @@
 
 <body>
     <!--TODO: Convert this to searching through the db-->
-    <h2>Search for phrases!</h2>
-    <form id="PhraseSearch" action="localhost:8080/searchphrase/" method="GET">
-        <div class="form-group">
-            <label for="searchInput">Search Here</label>
-            <input name="searchInput" type="text" class="form-control" id="searchInput" placeholder="Enter Search Term">
+    <div class="container-fluid">
+
+        <p class="display-2">Welcome to Hip-Hop Twitter Analytics</p>
+        <p class="display-4">Your home for a ridiculously small and unscientific analytics dashboard</p>
+        <p class="lead">Warning, this is not for use in production.</p>
+        <small>Seriously, you're not gonna get much here</small>
+
+        <div class="row">
+            <div class="col">
+                <a href="http://localhost:8080/api/v1/alltweets"><button type="button" class="btn btn-dark">All Tweets</button></a>
+                <a href="http://localhost:8080/api/v1/mostrt"><button type="button" class="btn btn-dark">Most Retweeted</button></a>
+                <a href="http://localhost:8080/api/v1/mostliked"><button type="button" class="btn btn-dark">Most Liked</button></a>
+            </div>
         </div>
-        <button type="submit" class="btn btn-primary">Submit</button>
-    </form>
+
+    </div>
+
+
 
     <!-- JS, Popper.js, and jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>

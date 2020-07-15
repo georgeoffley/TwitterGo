@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,6 +17,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// Using one connection to DB
+var client = *CreateDBCon()
+
+// Saving todo since the context can be vague
+var ctx = context.TODO()
+
+// Constants for Collections and DB
+const dbname = "icxSocial"
+const collectionName = "socialTweets"
+
 ///// Custom Data Types
 
 // APICred Struct for storing credentials
@@ -26,13 +37,14 @@ type APICred struct {
 	AccessTokenSecret string
 }
 
+// Also hold json and bson formatting for easier working with json
 type SocialRecord struct {
-	TweetId  int64
-	UserName string
-	Tweet    string
-	Likes    int
-	Retweets int
-	Created  string
+	TweetId  int64  `json:"tweetid" bson:"tweetid"`
+	UserName string `json:"username" bson:"username"`
+	Tweet    string `json:"tweet" bson:"tweet"`
+	Likes    int    `json:"likes" bson:"likes"`
+	Retweets int    `json:"retweets" bson:"retweets"`
+	Created  string `json:"created" bson:"created"`
 }
 
 /////// Twitter Functions
@@ -84,11 +96,11 @@ func CreateTwitSearch(api *twitterapi.TwitterApi, query string) (searchResult tw
 func CreateDBCon() (client *mongo.Client) {
 	// TODO: Put into function for multiple uses
 	clientoptions := options.Client().ApplyURI("mongodb://icx-db-mongo:27017")
-	client, err := mongo.Connect(context.TODO(), clientoptions)
+	client, err := mongo.Connect(ctx, clientoptions)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = client.Ping(context.TODO(), nil)
+	err = client.Ping(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,58 +117,71 @@ func CollectionItem(client *mongo.Client, dbName string, collectionNam string) (
 	return collection
 }
 
-// Search all docs in collection
-func ReturnAllDocs(client *mongo.Client, collection *mongo.Collection) (results []bson.M) {
+///// API Stuff
 
-	cursor, err := collection.Find(context.TODO(), bson.M{})
+// Search all docs in collection
+func ReturnAllDocs(client *mongo.Client, collection *mongo.Collection) (results []bson.D) {
+
+	cursor, err := collection.Find(ctx, bson.M{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var records []bson.M
+	var records []bson.D
 	/*
 		In production this would be cursor.Next() so that we're returning
 		the data in batches and not all at once. A production system would have millions
 		of records (documents) to return
 	*/
-	if err = cursor.All(context.TODO(), &records); err != nil {
+	if err = cursor.All(ctx, &records); err != nil {
 		log.Fatal(err)
 	}
 	return records
 }
 
-// Search single doc. Use the filter argument to find the document required
-func SingleDoc(client *mongo.Client, collection *mongo.Collection, filter bson.M) (tweet bson.M) {
-	if err := collection.FindOne(context.TODO(), filter).Decode(&tweet); err != nil {
-		log.Fatal(err)
-	}
+// Takes the collection and sorts by the indicated category and returns the top result
+func SearchMostPopularBySubject(category string) (mostPopularRecord SocialRecord) {
+	grabTweetCollection := CollectionItem(&client, dbname, collectionName)
 
-	return tweet
-}
+	opts := options.FindOne().SetSort(bson.D{{category, -1}})
 
-// Search many docs. Use the filter argument to find the documents required
-func ManyDocs(client *mongo.Client, collection *mongo.Collection, filter bson.M) (tweets []bson.M) {
-
-	cursor, err := collection.Find(context.TODO(), filter)
+	err := grabTweetCollection.FindOne(ctx, bson.D{}, opts).Decode(&mostPopularRecord)
 	if err != nil {
-		log.Fatal(err)
+		if err == mongo.ErrNoDocuments {
+			return
+			log.Fatal(err)
+		}
+		log.Fatal("Error")
 	}
 
-	// Same production ready changes to be applied here as with the all docs
-	if err = cursor.All(context.TODO(), &tweets); err != nil {
-		log.Fatal(err)
-	}
-
-	return tweets
+	return mostPopularRecord
 }
 
-///// API Stuff
-func SearchPhrase(write http.ResponseWriter, req *http.Request) {
-	params := mux.Vars(req)
-	write.Header().Set("Content-Type", "text/html")
-	write.WriteHeader(http.StatusOK)
-	write.Write([]byte(params["searchInput"]))
+///// API Calls
+
+// Search For most liked tweets and return to endpoint
+func SearchMostLikedTweet(write http.ResponseWriter, req *http.Request) {
+	write.Header().Set("Content-Type", "application/json")
+	mostLiked := SearchMostPopularBySubject("likes")
+	json.NewEncoder(write).Encode(mostLiked)
 }
+
+// Search Most retweeted tweet
+func SearchMostRtTweet(write http.ResponseWriter, req *http.Request) {
+	write.Header().Set("Content-Type", "application/json")
+	mostRt := SearchMostPopularBySubject("retweets")
+	json.NewEncoder(write).Encode(mostRt)
+}
+
+// Search for all tweets
+func SearchAll(write http.ResponseWriter, req *http.Request) {
+	write.Header().Set("Content-Type", "application/json")
+	grabTweetCollection := CollectionItem(&client, dbname, collectionName)
+	alldocs := ReturnAllDocs(&client, grabTweetCollection)
+	json.NewEncoder(write).Encode(alldocs)
+}
+
+//
 
 func main() {
 	fmt.Print("Hello from your Twitter container\n")
@@ -166,8 +191,8 @@ func main() {
 		Reuse connection pool below
 		so that we can do not have to keep opening DB connections
 	*/
-	dbclient := CreateDBCon()
-	tweetcollection := CollectionItem(dbclient, "icxSocial", "icxSocial")
+	dbclient := &client
+	tweetcollection := CollectionItem(dbclient, dbname, collectionName)
 
 	////// Twitter Stuff
 	api := CreateTwitterConn()
@@ -186,25 +211,27 @@ func main() {
 		tempSocialRecord.Retweets = tweet.RetweetCount
 		tempSocialRecord.Created = tweet.CreatedAt
 
+		// Append interface on each loop
 		BulkRecords = append(BulkRecords, tempSocialRecord)
 	}
 
 	// Take Populated Interface and Insert Records into DB
-	insert, err := tweetcollection.InsertMany(context.TODO(), BulkRecords)
+	insert, err := tweetcollection.InsertMany(ctx, BulkRecords)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Inserted Many Docs: %+v\n", insert.InsertedIDs)
 
 	// Testing
-	filter := bson.M{"likes": 0}
-	fmt.Println(ManyDocs(dbclient, tweetcollection, filter))
+	//fmt.Println(ReturnAllDocs(dbclient, tweetcollection))
 
 	/////// ROuter STuff
-	fmt.Print("Starting Server...\n")
+	fmt.Print("Starting API Server...\n")
 
 	router := mux.NewRouter()
-	router.Queries("searchInput", "{searchInput}")
-	router.HandleFunc("/searchphrase/{searchInput}", SearchPhrase)
+	router.HandleFunc("/api/v1/mostliked", SearchMostLikedTweet)
+	router.HandleFunc("/api/v1/mostrt", SearchMostRtTweet)
+	router.HandleFunc("/api/v1/alltweets", SearchAll)
+
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

@@ -1,7 +1,7 @@
 version: '3'
 services:
   api:
-    image: golang:1.14.1
+    image: golang:latest
     container_name: icx-api-go
     build: './api'
     ports:
@@ -13,7 +13,7 @@ services:
       - 'db'
   web:
     container_name: icx-api-web-page
-    image: 'nginx:latest'
+    image: 'nginx'
     build: ./web
     ports: 
         - 80:80
