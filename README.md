@@ -15,7 +15,7 @@ This should build the images linked to the docker-compose file and start them up
 
 The file system layout should look as such:
 
-icx_social_app
+root
 - api
     - .env
     - DockerFile
