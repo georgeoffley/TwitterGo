@@ -1,4 +1,4 @@
-# ICX Social App
+# Social App Backend
 ###### Not for use in production
 
 ## Running Containers
